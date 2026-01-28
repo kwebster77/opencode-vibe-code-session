@@ -53,35 +53,70 @@
     </style>
 </head>
 <body>
-    <h1>Text Input Application</h1>
+    <h1>Book Manager</h1>
     
     <div class="container">
-        <input type="text" id="textInput" placeholder="Enter some text...">
+        <input type="text" id="textInput" placeholder="Enter book name...">
         <button onclick="addItem()">Add</button>
     </div>
     
     <div id="itemsList" class="items-list"></div>
     
     <script>
-        function addItem() {
+        async function addItem() {
             const input = document.getElementById('textInput');
-            const itemsList = document.getElementById('itemsList');
-            
             const text = input.value.trim();
             
             if (text === '') {
-                alert('Please enter some text');
+                alert('Please enter a book name');
                 return;
             }
             
+            try {
+                const response = await fetch('http://localhost:3000/add', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ bookName: text })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    addBookToList(result);
+                    input.value = '';
+                    input.focus();
+                } else {
+                    const error = await response.json();
+                    alert('Error: ' + error.error);
+                }
+            } catch (error) {
+                alert('Error adding book: ' + error.message);
+            }
+        }
+        
+        function addBookToList(book) {
+            const itemsList = document.getElementById('itemsList');
+            
             const item = document.createElement('div');
             item.className = 'item';
-            item.textContent = text;
+            item.textContent = `${book.name} (ID: ${book.id})`;
             
             itemsList.appendChild(item);
-            
-            input.value = '';
-            input.focus();
+        }
+        
+        async function loadBooks() {
+            try {
+                const response = await fetch('http://localhost:3000/books');
+                const books = await response.json();
+                
+                const itemsList = document.getElementById('itemsList');
+                itemsList.innerHTML = '';
+                
+                books.forEach(book => addBookToList(book));
+            } catch (error) {
+                console.error('Error loading books:', error);
+            }
         }
         
         document.getElementById('textInput').addEventListener('keypress', function(event) {
@@ -89,6 +124,8 @@
                 addItem();
             }
         });
+        
+        loadBooks();
     </script>
 </body>
 </html>

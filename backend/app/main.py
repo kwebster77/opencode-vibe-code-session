@@ -5,7 +5,9 @@ from typing import List, Optional
 
 from app.database import get_db, create_tables
 from app.models.movie import Movie
+from app.models.book import Book
 from app.schemas.movie import MovieCreate, MovieResponse, MovieSort, Genre
+from app.schemas.book import BookCreate, BookResponse, BookSort, BookGenre
 
 app = FastAPI(title="Movie Website API", version="1.0.0")
 
@@ -75,6 +77,70 @@ async def sort_movies(
     
     movies = query.all()
     return movies
+
+# Book endpoints
+@app.post("/books/add", response_model=BookResponse)
+async def add_book(book: BookCreate, db: Session = Depends(get_db)):
+    """
+    Add a new book to the database.
+    """
+    db_book = Book(**book.dict())
+    db.add(db_book)
+    db.commit()
+    db.refresh(db_book)
+    return db_book
+
+@app.get("/books/view", response_model=List[BookResponse])
+async def view_books(
+    genre: Optional[BookGenre] = Query(None, description="Filter by genre"),
+    author: Optional[str] = Query(None, description="Filter by author"),
+    db: Session = Depends(get_db)
+):
+    """
+    View all books with optional genre and author filtering.
+    """
+    query = db.query(Book)
+    
+    if genre:
+        query = query.filter(Book.genre == genre.value)
+    
+    if author:
+        query = query.filter(Book.author.ilike(f"%{author}%"))
+    
+    books = query.order_by(Book.date_added.desc()).all()
+    return books
+
+@app.get("/books/sort", response_model=List[BookResponse])
+async def sort_books(
+    sort_by: BookSort = Query(..., description="Sort by field"),
+    genre: Optional[BookGenre] = Query(None, description="Filter by genre"),
+    author: Optional[str] = Query(None, description="Filter by author"),
+    db: Session = Depends(get_db)
+):
+    """
+    Sort books by specified field with optional genre and author filtering.
+    """
+    query = db.query(Book)
+    
+    if genre:
+        query = query.filter(Book.genre == genre.value)
+    
+    if author:
+        query = query.filter(Book.author.ilike(f"%{author}%"))
+    
+    if sort_by == BookSort.DATE_ADDED:
+        query = query.order_by(Book.date_added.desc())
+    elif sort_by == BookSort.TITLE:
+        query = query.order_by(Book.title.asc())
+    elif sort_by == BookSort.AUTHOR:
+        query = query.order_by(Book.author.asc(), Book.title.asc())
+    elif sort_by == BookSort.RATING:
+        query = query.order_by(Book.rating.desc() if Book.rating is not None else Book.date_added.desc())
+    elif sort_by == BookSort.PUBLICATION_YEAR:
+        query = query.order_by(Book.publication_year.desc() if Book.publication_year is not None else Book.date_added.desc())
+    
+    books = query.all()
+    return books
 
 @app.get("/")
 async def root():
